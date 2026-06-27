@@ -371,7 +371,7 @@ size_t dmx_send_num(dmx_port_t dmx_num, size_t size) {
   // Block if an alarm was set
   if (timer_elapsed < timer_alarm) {
     if (!xTaskNotifyWait(0, ULONG_MAX, NULL, dmx_ms_to_ticks(20))) {
-      __unreachable();  // The hardware timer should always notify the task
+      __builtin_unreachable();  // The hardware timer should always notify
     }
     driver->task_waiting = NULL;
   }

@@ -24,5 +24,13 @@ idf_component_register(
        "src/rdm/responder/dmx_setup.c" "src/rdm/responder/sensor_parameter.c"
        "src/rdm/responder/power_lamp.c" "src/rdm/responder/utils.c"
   INCLUDE_DIRS "src"
-  REQUIRES driver esp_timer esp_common esp_hw_support nvs_flash
+  REQUIRES driver
+           esp_driver_gpio
+           esp_driver_gptimer
+           esp_driver_uart
+           esp_hal_uart
+           esp_timer
+           esp_common
+           esp_hw_support
+           nvs_flash
 )   

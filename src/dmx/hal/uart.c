@@ -12,7 +12,7 @@
 #include "esp_private/periph_ctrl.h"
 #include "esp_timer.h"
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 2, 0)
-#include "soc/uart_periph.h"
+#include "hal/uart_periph.h"
 #endif
 #else
 #include "driver/periph_ctrl.h"
@@ -327,15 +327,27 @@ static void DMX_ISR_ATTR dmx_uart_isr(void *arg) {
 bool dmx_uart_init(dmx_port_t dmx_num, void *isr_context, int isr_flags) {
   struct dmx_uart_t *uart = &dmx_uart_context[dmx_num];
 
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+  uart_ll_enable_bus_clock(dmx_num, true);
+#else
   periph_module_enable(uart_periph_signal[dmx_num].module);
+#endif
   if (dmx_num != 0) {  // Default UART port for console
 #if SOC_UART_REQUIRE_CORE_RESET
     // ESP32C3 workaround to prevent UART outputting garbage data
     uart_ll_set_reset_core(uart->dev, true);
-    periph_module_reset(uart_periph_signal[dmx_num].module);
-    uart_ll_set_reset_core(uart->dev, false);
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+  uart_ll_reset_register(dmx_num);
 #else
     periph_module_reset(uart_periph_signal[dmx_num].module);
+#endif
+    uart_ll_set_reset_core(uart->dev, false);
+#else
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+  uart_ll_reset_register(dmx_num);
+#else
+    periph_module_reset(uart_periph_signal[dmx_num].module);
+#endif
 #endif
   }
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
@@ -381,7 +393,12 @@ bool dmx_uart_init(dmx_port_t dmx_num, void *isr_context, int isr_flags) {
 void dmx_uart_deinit(dmx_port_t dmx_num) {
   struct dmx_uart_t *uart = &dmx_uart_context[dmx_num];
   if (uart->num != 0) {  // Default UART port for console
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+  uart_ll_sclk_disable(uart->dev);
+  uart_ll_enable_bus_clock(uart->num, false);
+#else
     periph_module_disable(uart_periph_signal[uart->num].module);
+#endif
   }
 }
 

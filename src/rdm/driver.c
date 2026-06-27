@@ -94,7 +94,7 @@ static size_t rdm_format_encode(void *restrict dest,
         // Don't need to swap endianness on single byte
         f += 2;  // Skip to the next token
       } else {
-        __unreachable();  // Unknown symbol
+        __builtin_unreachable();  // Unknown symbol
       }
 
       // Update cursor
