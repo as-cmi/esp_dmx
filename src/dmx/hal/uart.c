@@ -264,9 +264,32 @@ static void DMX_ISR_ATTR dmx_uart_isr(void *arg) {
     else if (intr_flags & DMX_INTR_TX_DATA) {
       // Write data to the UART and clear the interrupt
       int write_len = driver->dmx.size - driver->dmx.head;
-      dmx_uart_write_txfifo(dmx_num, &driver->dmx.data[driver->dmx.head],
-                            &write_len);
-      driver->dmx.head += write_len;
+      if (write_len > 0) {
+        dmx_uart_write_txfifo(dmx_num, &driver->dmx.data[driver->dmx.head],
+                              &write_len);
+        driver->dmx.head += write_len;
+      } else {
+        // head/size are already inconsistent (head >= size): there is
+        // nothing left to send. Without this guard a negative write_len
+        // either wraps into a huge unsigned count in the low-level FIFO
+        // write (out-of-bounds crash - what the earlier fix in
+        // dmx_uart_write_txfifo prevents) or, if silently swallowed there,
+        // leaves head permanently behind size so the "done" check below
+        // never fires and this same interrupt re-triggers forever
+        // (interrupt watchdog timeout - what was actually observed).
+        // Force head/size back in sync so the done-check below can fire.
+        //
+        // TODO(rdmTester): this only contains the symptom. We never found
+        // why driver->dmx.head and driver->dmx.size go out of sync in the
+        // first place - it surfaced reproducibly around WiFi STA connecting
+        // (high system/interrupt load) with RDM discovery active on both
+        // DMX channels. Worth tracing every task-side write to
+        // driver->dmx.head/.size (RDM response path in particular) for a
+        // missing critical section or a stale head from a prior TX that
+        // wasn't reset before the next one started. Revisit before relying
+        // on this fork for anything RDM-timing-sensitive.
+        driver->dmx.head = driver->dmx.size;
+      }
       dmx_uart_clear_interrupt(dmx_num, DMX_INTR_TX_DATA);
 
       // Allow FIFO to empty when done writing data
@@ -502,6 +525,15 @@ uint32_t DMX_ISR_ATTR dmx_uart_get_txfifo_len(dmx_port_t dmx_num) {
 void DMX_ISR_ATTR dmx_uart_write_txfifo(dmx_port_t dmx_num, const void *buf,
                                         int *size) {
   struct dmx_uart_t *uart = &dmx_uart_context[dmx_num];
+  // Defensive: a caller-side head/size mismatch can drive *size negative.
+  // Left unclamped, a negative int reinterpreted as an unsigned length by
+  // uart_ll_write_txfifo() turns into a huge write that walks `buf` far out
+  // of bounds until it faults (observed as a LoadStoreError at 0x40000000).
+  // Treat "negative bytes to send" as "nothing to send" instead of crashing.
+  if (*size <= 0) {
+    *size = 0;
+    return;
+  }
   const int txfifo_len = uart_ll_get_txfifo_len(uart->dev);
   if (*size > txfifo_len) *size = txfifo_len;
   uart_ll_write_txfifo(uart->dev, (uint8_t *)buf, *size);
