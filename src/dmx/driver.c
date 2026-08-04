@@ -348,6 +348,19 @@ bool dmx_driver_enable(dmx_port_t dmx_num) {
   return true;
 }
 
+bool dmx_driver_reset_controller_state(dmx_port_t dmx_num) {
+  DMX_CHECK(dmx_num < DMX_NUM_MAX, false, "dmx_num error");
+  DMX_CHECK(dmx_driver_is_installed(dmx_num), false, "driver is not installed");
+
+  dmx_driver_t *const driver = dmx_driver[dmx_num];
+
+  taskENTER_CRITICAL(DMX_SPINLOCK(dmx_num));
+  driver->is_controller = false;
+  taskEXIT_CRITICAL(DMX_SPINLOCK(dmx_num));
+
+  return true;
+}
+
 bool dmx_set_pin(dmx_port_t dmx_num, int tx_pin, int rx_pin, int rts_pin) {
   DMX_CHECK(dmx_num < DMX_NUM_MAX, false, "dmx_num error");
   DMX_CHECK(dmx_tx_pin_is_valid(tx_pin), false, "tx_pin error");

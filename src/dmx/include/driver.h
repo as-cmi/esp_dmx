@@ -84,6 +84,27 @@ bool dmx_driver_disable(dmx_port_t dmx_num);
 bool dmx_driver_enable(dmx_port_t dmx_num);
 
 /**
+ * @brief Resets a port's internal "is this device the controller on the DMX
+ * bus" state.
+ *
+ * @note dmx_send_num()/dmx_receive_num() latch this flag based on the last
+ * packet seen on the bus (an RDM request marks this device as a controller)
+ * and it persists across unrelated later use of the port. In particular,
+ * once a port has been used to send RDM controller requests (e.g. RDM
+ * discovery), dmx_receive()/dmx_receive_num() will keep taking their
+ * RDM-response-timing fast path - which returns almost immediately instead
+ * of honoring the caller's requested wait_ticks - even for ordinary,
+ * non-RDM DMX reception on that same port. Call this after repurposing a
+ * port away from RDM controller use (e.g. before using it for plain
+ * continuous DMX input) to restore normal blocking-receive behavior.
+ *
+ * @param dmx_num The DMX port number.
+ * @return true on success.
+ * @return false on failure.
+ */
+bool dmx_driver_reset_controller_state(dmx_port_t dmx_num);
+
+/**
  * @brief Checks if DMX driver is installed.
  *
  * @param dmx_num The DMX port number.
