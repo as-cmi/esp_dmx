@@ -15,7 +15,7 @@ idf_component_register(
        # RDM controller
        "src/rdm/controller/discovery.c" "src/rdm/controller/product_info.c"
        "src/rdm/controller/device_control.c" "src/rdm/controller/dmx_setup.c"
-       "src/rdm/controller/utils.c"
+       "src/rdm/controller/rdm_info.c" "src/rdm/controller/utils.c"
        
        # RDM responder
        "src/rdm/responder.c" "src/rdm/responder/discovery.c"
