@@ -118,3 +118,26 @@ size_t rdm_send_get_device_label(dmx_port_t dmx_num,
   return rdm_send_request(dmx_num, &request, format, device_label, size,
                           ack);
 }
+
+bool rdm_send_set_device_label(dmx_port_t dmx_num, const rdm_uid_t *dest_uid,
+                               rdm_sub_device_t sub_device,
+                               const char *device_label, size_t size,
+                               rdm_ack_t *ack) {
+  DMX_CHECK(dmx_num < DMX_NUM_MAX, 0, "dmx_num error");
+  DMX_CHECK(dest_uid != NULL, 0, "dest_uid is null");
+  DMX_CHECK(sub_device < RDM_SUB_DEVICE_MAX || sub_device == RDM_SUB_DEVICE_ALL,
+            0, "sub_device error");
+  DMX_CHECK(device_label != NULL, 0, "device_label is null");
+  DMX_CHECK(size <= 32, 0, "device_label is too long");
+  DMX_CHECK(dmx_driver_is_installed(dmx_num), 0, "driver is not installed");
+
+  const rdm_request_t request = {.dest_uid = dest_uid,
+                                 .sub_device = sub_device,
+                                 .cc = RDM_CC_SET_COMMAND,
+                                 .pid = RDM_PID_DEVICE_LABEL,
+                                 .format = "a$",
+                                 .pd = device_label,
+                                 .pdl = size};
+
+  return rdm_send_request(dmx_num, &request, NULL, NULL, 0, ack);
+}

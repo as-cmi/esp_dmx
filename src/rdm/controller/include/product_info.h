@@ -153,6 +153,30 @@ size_t rdm_send_get_device_label(dmx_port_t dmx_num,
                                  char *device_label, size_t size,
                                  rdm_ack_t *ack);
 
+/**
+ * @brief Sends an RDM SET device label request and reads the response, if
+ * any.
+ *
+ * SET device label requests are sent with a string up to 32 bytes long
+ * indicating the new user-assigned label for the responding device.
+ * Responding devices send a response without any parameter data.
+ *
+ * @param dmx_num The DMX port number.
+ * @param[in] dest_uid A pointer to the UID of the destination.
+ * @param sub_device The sub-device number of the destination.
+ * @param[in] device_label The new label to assign, up to 32 bytes.
+ * @param size The length of device_label in bytes.
+ * @param[out] ack A pointer to an ACK struct which contains information about
+ * the response, including information if no response is received.
+ * @return true if a properly formatted RDM_RESPONSE_TYPE_ACK was received.
+ * @return false if no response was received, was improperly formatted, or an
+ * RDM_RESPONSE_TYPE_ACK was not received.
+ */
+bool rdm_send_set_device_label(dmx_port_t dmx_num, const rdm_uid_t *dest_uid,
+                               rdm_sub_device_t sub_device,
+                               const char *device_label, size_t size,
+                               rdm_ack_t *ack);
+
 #ifdef __cplusplus
 }
 #endif

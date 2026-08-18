@@ -75,3 +75,28 @@ size_t rdm_send_get_parameter_value(dmx_port_t dmx_num,
 
   return rdm_send_request(dmx_num, &request, format, pd, size, ack);
 }
+
+bool rdm_send_set_parameter_value(dmx_port_t dmx_num,
+                                  const rdm_uid_t *dest_uid,
+                                  rdm_sub_device_t sub_device, rdm_pid_t pid,
+                                  const char *format, const void *pd,
+                                  size_t size, rdm_ack_t *ack) {
+  DMX_CHECK(dmx_num < DMX_NUM_MAX, 0, "dmx_num error");
+  DMX_CHECK(dest_uid != NULL, 0, "dest_uid is null");
+  DMX_CHECK(sub_device < RDM_SUB_DEVICE_MAX || sub_device == RDM_SUB_DEVICE_ALL,
+            0, "sub_device error");
+  DMX_CHECK(pid >= RDM_PID_MANUFACTURER_SPECIFIC_BEGIN &&
+            pid <= RDM_PID_MANUFACTURER_SPECIFIC_END, 0, "pid error");
+  DMX_CHECK(format != NULL && pd != NULL, 0, "format or pd is null");
+  DMX_CHECK(dmx_driver_is_installed(dmx_num), 0, "driver is not installed");
+
+  const rdm_request_t request = {.dest_uid = dest_uid,
+                                 .sub_device = sub_device,
+                                 .cc = RDM_CC_SET_COMMAND,
+                                 .pid = pid,
+                                 .format = format,
+                                 .pd = pd,
+                                 .pdl = size};
+
+  return rdm_send_request(dmx_num, &request, NULL, NULL, 0, ack);
+}

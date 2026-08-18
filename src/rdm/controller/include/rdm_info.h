@@ -105,6 +105,32 @@ size_t rdm_send_get_parameter_value(dmx_port_t dmx_num,
                                     rdm_pid_t pid, const char *format,
                                     void *pd, size_t size, rdm_ack_t *ack);
 
+/**
+ * @brief Sends a generic RDM SET request for a manufacturer-specific PID's
+ * value. SET counterpart to rdm_send_get_parameter_value() - same
+ * runtime-determined-format rationale, chosen from a prior
+ * rdm_send_get_parameter_description() call's data_type/pdl_size fields.
+ *
+ * @param dmx_num The DMX port number.
+ * @param[in] dest_uid A pointer to the UID of the destination.
+ * @param sub_device The sub-device number of the destination.
+ * @param pid The manufacturer-specific PID whose value is being set.
+ * @param format The outgoing parameter data format string, chosen by the
+ * caller to match the PID's data type.
+ * @param[in] pd A pointer to the value to send, in a shape matching format.
+ * @param size The size, in bytes, of pd.
+ * @param[out] ack A pointer to an ACK struct which contains information about
+ * the response, including information if no response is received.
+ * @return true if a properly formatted RDM_RESPONSE_TYPE_ACK was received.
+ * @return false if no response was received, was improperly formatted, or an
+ * RDM_RESPONSE_TYPE_ACK was not received.
+ */
+bool rdm_send_set_parameter_value(dmx_port_t dmx_num,
+                                  const rdm_uid_t *dest_uid,
+                                  rdm_sub_device_t sub_device, rdm_pid_t pid,
+                                  const char *format, const void *pd,
+                                  size_t size, rdm_ack_t *ack);
+
 #ifdef __cplusplus
 }
 #endif

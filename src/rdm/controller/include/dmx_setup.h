@@ -68,6 +68,40 @@ bool rdm_send_set_dmx_start_address(dmx_port_t dmx_num,
                                     rdm_ack_t *ack);
 
 /**
+ * @brief Sends an RDM GET DMX personality request and reads the response, if
+ * any.
+ *
+ * GET DMX personality requests are sent without parameter data. If a
+ * response is received, the response parameter data will include the
+ * currently active personality number and the total number of personalities
+ * supported by the responding device.
+ *
+ * Added 2026-08-17: a prior comment on rdm_send_set_dmx_personality() below
+ * argued this wasn't needed since GET DEVICE_INFO already reports the
+ * current personality - true for read/display purposes, but real-hardware
+ * testing (ClayPaky K10) found that this dedicated, minimal request can get
+ * a response from a device that's still too busy after a personality change
+ * to answer the much larger GET DEVICE_INFO request. Prefer this over GET
+ * DEVICE_INFO specifically when verifying a personality SET that got no
+ * response.
+ *
+ * @param dmx_num The DMX port number.
+ * @param[in] dest_uid A pointer to the UID of the destination.
+ * @param sub_device The sub-device number of the destination.
+ * @param[out] personality A pointer to a parameter which will be received in
+ * the response.
+ * @param[out] ack A pointer to an ACK struct which contains information about
+ * the response, including information if no response is received.
+ * @return The number of bytes that were received in the response parameter
+ * data.
+ */
+size_t rdm_send_get_dmx_personality(dmx_port_t dmx_num,
+                                    const rdm_uid_t *dest_uid,
+                                    rdm_sub_device_t sub_device,
+                                    rdm_dmx_personality_t *personality,
+                                    rdm_ack_t *ack);
+
+/**
  * @brief Sends an RDM GET DMX personality description request and reads the
  * response, if any.
  *
@@ -94,6 +128,35 @@ size_t rdm_send_get_dmx_personality_description(
     rdm_sub_device_t sub_device, uint8_t personality_num,
     rdm_dmx_personality_description_t *personality_description,
     rdm_ack_t *ack);
+
+/**
+ * @brief Sends an RDM SET DMX personality request and reads the response, if
+ * any.
+ *
+ * SET DMX personality requests are sent with an 8-bit personality number
+ * (1-indexed, must be greater than 0) indicating to which personality the
+ * responding device(s) should switch. Responding devices send a response
+ * without any parameter data. See rdm_send_get_dmx_personality() above for
+ * the dedicated GET counterpart - added after real hardware showed the
+ * aggregate GET DEVICE_INFO (which also reports current personality) isn't
+ * a safe substitute for verifying this specific SET.
+ *
+ * @param dmx_num The DMX port number.
+ * @param[in] dest_uid A pointer to the UID of the destination.
+ * @param sub_device The sub-device number of the destination.
+ * @param personality_num The personality number to switch to. Must be
+ * greater than 0.
+ * @param[out] ack A pointer to an ACK struct which contains information about
+ * the response, including information if no response is received.
+ * @return true if a properly formatted RDM_RESPONSE_TYPE_ACK was received.
+ * @return false if no response was received, was improperly formatted, or an
+ * RDM_RESPONSE_TYPE_ACK was not received.
+ */
+bool rdm_send_set_dmx_personality(dmx_port_t dmx_num,
+                                  const rdm_uid_t *dest_uid,
+                                  rdm_sub_device_t sub_device,
+                                  const uint8_t personality_num,
+                                  rdm_ack_t *ack);
 
 #ifdef __cplusplus
 }
