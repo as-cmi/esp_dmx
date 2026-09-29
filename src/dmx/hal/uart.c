@@ -351,6 +351,11 @@ bool dmx_uart_init(dmx_port_t dmx_num, void *isr_context, int isr_flags) {
   struct dmx_uart_t *uart = &dmx_uart_context[dmx_num];
 
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+  // uart_ll_enable_bus_clock()/uart_ll_reset_register() expand to a
+  // PERIPH_RCC_ATOMIC()-style macro that references this variable; it's
+  // normally declared by that wrapper, but these are called directly here.
+  // Same pattern as IDF's own controller_hci_uart_demo.c example.
+  int __DECLARE_RCC_ATOMIC_ENV __attribute__((unused));
   uart_ll_enable_bus_clock(dmx_num, true);
 #else
   periph_module_enable(uart_periph_signal[dmx_num].module);
@@ -417,6 +422,7 @@ void dmx_uart_deinit(dmx_port_t dmx_num) {
   struct dmx_uart_t *uart = &dmx_uart_context[dmx_num];
   if (uart->num != 0) {  // Default UART port for console
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+  int __DECLARE_RCC_ATOMIC_ENV __attribute__((unused));
   uart_ll_sclk_disable(uart->dev);
   uart_ll_enable_bus_clock(uart->num, false);
 #else
