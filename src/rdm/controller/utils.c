@@ -7,9 +7,12 @@
 #include "rdm/include/driver.h"
 #include "rdm/include/uid.h"
 
-size_t rdm_send_request(dmx_port_t dmx_num, const rdm_request_t *request,
-                        const char *format, void *pd, size_t size,
-                        rdm_ack_t *ack) {
+// One request/response exchange - see rdm_send_request() below, which adds
+// the ACK_TIMER follow-up on top of this.
+static size_t rdm_send_request_once(dmx_port_t dmx_num,
+                                    const rdm_request_t *request,
+                                    const char *format, void *pd, size_t size,
+                                    rdm_ack_t *ack) {
   assert(dmx_num < DMX_NUM_MAX);
   assert(request != NULL);
   assert(request->dest_uid != NULL);
@@ -146,9 +149,10 @@ size_t rdm_send_request(dmx_port_t dmx_num, const rdm_request_t *request,
       const char *word_format = "w";
       ack->type = header.response_type;
       if (header.response_type == RDM_RESPONSE_TYPE_ACK_TIMER) {
+        // Estimated response time, in units of 100ms (ANSI E1.20 6.3.2).
         uint16_t timer;
         rdm_read_pd(dmx_num, word_format, &timer, sizeof(timer));
-        ack->timer = dmx_ms_to_ticks(timer * 10);
+        ack->timer = dmx_ms_to_ticks((uint32_t)timer * 100);
       } else if (header.response_type == RDM_RESPONSE_TYPE_NACK_REASON) {
         uint16_t nack_reason;
         rdm_read_pd(dmx_num, word_format, &nack_reason, sizeof(nack_reason));
@@ -176,6 +180,53 @@ size_t rdm_send_request(dmx_port_t dmx_num, const rdm_request_t *request,
 
     return 0;
   }
+}
+
+// How an ACK_TIMER is followed up: wait what the responder asked for (within
+// these bounds - the caller, often the task that also refreshes DMX, is held
+// meanwhile) and send the same request again, a few times at most.
+#define RDM_ACK_TIMER_MAX_RETRIES 4
+#define RDM_ACK_TIMER_WAIT_MIN_MS 50
+#define RDM_ACK_TIMER_WAIT_MAX_MS 500
+
+size_t rdm_send_request(dmx_port_t dmx_num, const rdm_request_t *request,
+                        const char *format, void *pd, size_t size,
+                        rdm_ack_t *ack) {
+  rdm_ack_t local_ack;
+  if (ack == NULL) {
+    ack = &local_ack;
+  }
+
+  size_t ret = rdm_send_request_once(dmx_num, request, format, pd, size, ack);
+
+  // ACK_TIMER: the responder has the request but not the answer yet. It was
+  // simply reported to the caller, and every caller took it for a failure.
+  // Seen where the RDM line is carried over a network: fixtures behind a
+  // LumiNode (DMX out) -> Art-Net -> LumiNode (DMX in) chain, this controller
+  // on the second node's input. What sits on the wire there cannot fetch the
+  // far answer within the RDM response time, so most GETs came back as
+  // ACK_TIMER the first time and the data was handed over when the same PID
+  // was asked again. Without a follow-up the read was lost, and worse, the
+  // prepared answer came out on the *next* request for that PID, whatever it
+  // asked for: sensor 1 got sensor 0's definition, one personality another's
+  // description. Asking again after the estimated time is meant to get the
+  // right answer to the right question - not yet tried against that setup.
+  for (int retry = 0; retry < RDM_ACK_TIMER_MAX_RETRIES &&
+                      ack->type == RDM_RESPONSE_TYPE_ACK_TIMER;
+       ++retry) {
+    TickType_t wait = ack->timer;
+    const TickType_t wait_min = dmx_ms_to_ticks(RDM_ACK_TIMER_WAIT_MIN_MS);
+    const TickType_t wait_max = dmx_ms_to_ticks(RDM_ACK_TIMER_WAIT_MAX_MS);
+    if (wait < wait_min) {
+      wait = wait_min;
+    } else if (wait > wait_max) {
+      wait = wait_max;
+    }
+    vTaskDelay(wait);
+    ret = rdm_send_request_once(dmx_num, request, format, pd, size, ack);
+  }
+
+  return ret;
 }
 
 uint32_t rdm_get_transaction_num(dmx_port_t dmx_num) {
