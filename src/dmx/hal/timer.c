@@ -29,6 +29,16 @@ static bool DMX_ISR_ATTR dmx_timer_isr(
   if (driver->dmx.status == DMX_STATUS_SENDING) {
     if (driver->dmx.progress == DMX_PROGRESS_IN_BREAK) {
       dmx_uart_invert_tx(dmx_num, 0);
+      // Count the mark-after-break from here, where the line actually went
+      // high, not from the break alarm: the counter was auto-reloaded at the
+      // alarm, so it already holds this interrupt's latency. Counted from the
+      // alarm, that latency came off the MAB; a latency longer than the MAB
+      // left the alarm below the counter, it fired at once, and the first
+      // slot followed with whatever the two interrupts took - under the 12 us
+      // minimum. A late interrupt now lengthens the break instead, which DMX
+      // allows. Reset before the alarm is set, so it can't fire on a stale
+      // count.
+      dmx_timer_set_counter(dmx_num, 0);
       driver->dmx.progress = DMX_PROGRESS_IN_MAB;
 
       // Reset the alarm for the end of the DMX mark-after-break
