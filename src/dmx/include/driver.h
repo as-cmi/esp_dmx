@@ -105,6 +105,24 @@ bool dmx_driver_enable(dmx_port_t dmx_num);
 bool dmx_driver_reset_controller_state(dmx_port_t dmx_num);
 
 /**
+ * @brief Brings a driver whose state machine got stuck back to idle. Seen
+ * on rdmTester (two ports doing RDM at the same instants): the driver left
+ * with status SENDING for good, so dmx_wait_sent() never succeeds, every
+ * send and RDM request returns at once, and dmx_driver_disable() refuses to
+ * run. This stops the timer, drops whatever transmission was in progress,
+ * releases the line from a break, empties both FIFOs, marks the driver idle
+ * and waiting for a break, and clears the controller state.
+ *
+ * Call it from the task that uses the port, between operations - never
+ * while a send or receive is in progress on it.
+ *
+ * @param dmx_num The DMX port number.
+ * @return true on success.
+ * @return false on failure.
+ */
+bool dmx_driver_recover(dmx_port_t dmx_num);
+
+/**
  * @brief Checks if DMX driver is installed.
  *
  * @param dmx_num The DMX port number.

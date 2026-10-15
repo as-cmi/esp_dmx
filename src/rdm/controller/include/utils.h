@@ -92,6 +92,50 @@ size_t rdm_send_request(dmx_port_t dmx_num, const rdm_request_t *request,
  */
 uint32_t rdm_get_transaction_num(dmx_port_t dmx_num);
 
+/* --- Diagnostic trace (rdmTester) -------------------------------------
+ * Every controller transaction rdm_send_request() makes is recorded in a
+ * small ring per port: what was asked, what came back (raw header bytes),
+ * how long it took and the driver's state afterwards. Read it with
+ * rdm_trace_read(); kept in RAM so recording doesn't disturb RDM timing the
+ * way logging would. Only with CONFIG_RDM_DEBUG_TRACE: otherwise nothing is
+ * recorded and rdm_trace_read() always returns 0. */
+#define RDM_TRACE_LEN 32
+#define RDM_TRACE_RAW_LEN 26
+
+typedef enum {
+  RDM_TRACE_ACCEPTED = 0,  // a response was accepted (its type is in raw[16])
+  RDM_TRACE_NO_ANSWER,     // nothing received
+  RDM_TRACE_BAD_HEADER,    // received, but not a valid RDM packet
+  RDM_TRACE_MISMATCH,      // valid, but not the answer to this request
+  RDM_TRACE_SEND_BUSY,     // the previous packet hadn't finished sending
+  RDM_TRACE_SEND_FAILED,   // dmx_send() refused
+  RDM_TRACE_BROADCAST,     // broadcast: no answer expected
+} rdm_trace_outcome_t;
+
+typedef struct rdm_trace_entry_t {
+  uint32_t seq;        // 1, 2, ... per port; 0 = empty slot
+  uint32_t t_ms;       // since boot
+  rdm_uid_t dest;      // UID asked
+  uint16_t pid;
+  uint8_t cc;
+  uint8_t tn;
+  int16_t size;        // received packet size, -1 when nothing was awaited
+  uint8_t err;         // dmx_err_t of the receive
+  uint8_t outcome;     // rdm_trace_outcome_t
+  uint32_t rx_us;      // from sending to the end of the receive
+  uint8_t status;      // driver->dmx.status after the transaction
+  uint8_t progress;    // driver->dmx.progress
+  int16_t head;        // driver->dmx.head
+  uint8_t is_controller;
+  uint8_t rts;         // 1 = transceiver listening
+  uint8_t raw[RDM_TRACE_RAW_LEN];  // driver->dmx.data[0..25] after the receive
+} rdm_trace_entry_t;
+
+/** Copies, oldest first, up to max entries of dmx_num's trace whose seq is
+ * greater than since; returns how many (0 without CONFIG_RDM_DEBUG_TRACE). */
+size_t rdm_trace_read(dmx_port_t dmx_num, uint32_t since,
+                      rdm_trace_entry_t *out, size_t max);
+
 #ifdef __cplusplus
 }
 #endif

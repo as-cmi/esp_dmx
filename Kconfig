@@ -55,6 +55,17 @@ menu "DMX/RDM Configuration"
             enabling this feature, RDM discovery must only be called on one port
             at a time.
     
+    config RDM_DEBUG_TRACE
+        bool "Record a trace of RDM controller transactions"
+        default n
+        help
+            Records every request the RDM controller sends in a 32-entry ring
+            per port: what was asked, the raw bytes that came back, how long
+            it took and the driver's state afterwards. Read it with
+            rdm_trace_read(). Kept in RAM rather than logged, so it doesn't
+            change RDM timing. Costs about 5 KB of static RAM with two
+            ports; leave it off unless chasing an RDM bug.
+
     config RDM_DISCOVERY_TRANSACTION_SPACING
         int "RDM discovery transaction packet spacing"
         range 2800 999999

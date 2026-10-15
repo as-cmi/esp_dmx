@@ -1,5 +1,6 @@
 #include "dmx/include/driver.h"
 
+#include <limits.h>
 #include <string.h>
 
 #include "dmx/hal/include/gpio.h"
@@ -357,6 +358,35 @@ bool dmx_driver_reset_controller_state(dmx_port_t dmx_num) {
   taskENTER_CRITICAL(DMX_SPINLOCK(dmx_num));
   driver->is_controller = false;
   taskEXIT_CRITICAL(DMX_SPINLOCK(dmx_num));
+
+  return true;
+}
+
+bool dmx_driver_recover(dmx_port_t dmx_num) {
+  DMX_CHECK(dmx_num < DMX_NUM_MAX, false, "dmx_num error");
+  DMX_CHECK(dmx_driver_is_installed(dmx_num), false, "driver is not installed");
+
+  dmx_driver_t *const driver = dmx_driver[dmx_num];
+
+  taskENTER_CRITICAL(DMX_SPINLOCK(dmx_num));
+  dmx_timer_stop(dmx_num);
+  dmx_uart_disable_interrupt(dmx_num, DMX_INTR_TX_ALL);
+  dmx_uart_clear_interrupt(dmx_num, DMX_INTR_TX_ALL);
+  dmx_uart_invert_tx(dmx_num, 0);  // in case it was stuck mid-break
+  dmx_uart_txfifo_reset(dmx_num);
+  dmx_uart_rxfifo_reset(dmx_num);
+  dmx_uart_clear_interrupt(dmx_num, DMX_INTR_RX_ALL);
+  driver->dmx.status = DMX_STATUS_IDLE;
+  driver->dmx.progress = DMX_PROGRESS_STALE;
+  driver->dmx.head = DMX_HEAD_WAITING_FOR_BREAK;
+  driver->task_waiting = NULL;
+  driver->is_controller = false;
+  taskEXIT_CRITICAL(DMX_SPINLOCK(dmx_num));
+
+  // A notification an ISR sent for the dropped transaction must not end the
+  // caller's next wait early.
+  xTaskNotifyStateClear(NULL);
+  ulTaskNotifyValueClear(NULL, ULONG_MAX);
 
   return true;
 }
